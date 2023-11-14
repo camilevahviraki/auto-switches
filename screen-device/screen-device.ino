@@ -95,7 +95,7 @@ void setup() {
   pinMode (lcdLed,OUTPUT); // led lcd button
   pinMode (pvLed,OUTPUT); // lcd led
   pinMode (regLed,OUTPUT); // lcd led 
-//  pinMode (regButton,INPUT); // snel button
+ pinMode (regButton,INPUT); // snel button
   pinMode (pvButton,INPUT); // pv button
 //  pinMode (ledLcd,OUTPUT); // remote pv
   emon1.voltage(1, 270, 1.7);  // Voltage: input pin, calibration, phase_shift
@@ -105,7 +105,7 @@ void setup() {
   Read1 ();
   getPvEnrgy = getNumber(t1,t0);
   getRegEnrgy = getNumber(t3,t2);
-  digitalWrite(lcdLed,1);
+  digitalWrite(lcdLed,0);
 }
 
 void loop() {
