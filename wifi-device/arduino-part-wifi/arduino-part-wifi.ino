@@ -9,6 +9,7 @@
 #include <DS1307RTC.h>
 #include "AT24C256.h"
 #include <ArduinoJson.h>
+//#include <ArduinoJson.h>
 //Create Object b
 AT24C256 eeprom = AT24C256();
 SoftwareSerial espSerial(5, 6); // RX, TX the pin used to communuccate zith bluetooth
@@ -22,12 +23,11 @@ PCD8544 lcd;
 #define pvLed 13 //  put here output pv led pin
 #define regLed 12 //  put here output reg led pin
 #define pvButton 1// put here input button for manual switching of pv
-#define regButton A6// put here input button for manual switching of reg
+#define regButton 0// put here input button for manual switching of reg
 #define lcdButton A7// put here input button for manual lighting of the lcd
 #define DS1307_CTRL_ID 0x68 // rtc address
 
-const unsigned long longClickDuration = 1000; // D#include <ArduinoJson.h>
-efine the duration for a long click in milliseconds
+const unsigned long longClickDuration = 1000; // Define the duration for a long click in milliseconds
 
 int buttonState1 = 80, buttonState2 = 80; // Current state of the button (LOW or HIGH)
 int lastButtonState = 80; // Previous state of the button
@@ -74,8 +74,8 @@ double Irms,Vrms,realPower;
  boolean lastVCross, checkVCross;
  double  sqI,sumI,sqV,sumV,instP,sumP;
  double ICAL= 79.9 ,VCAL = 275,PHASECAL = 1.7;
- int SupplyVoltage=5000;
- //int SupplyVoltage = 3300;
+//  int SupplyVoltage=5000;
+ int SupplyVoltage = 3300;
  #define  ADC_BITS 10
  #define ADC_COUNTS  (1<<ADC_BITS)
  double offsetI = ADC_COUNTS>>1;
@@ -88,7 +88,7 @@ double Irms,Vrms,realPower;
  int remote_switch = 0;
  int previous = 0;
  int prev_rem_reg; 
-
+ unsigned long previousrealMillis = 0; 
 
 void setup() {
   // put your setup code here, to run once:
@@ -128,34 +128,29 @@ void loop() {
    regValu = analogRead(inReg);
    lcdButtonValu = digitalRead(lcdButton);
  
-//  /////////////////////////////////////////////////////////////////////////////// wifi
+//  //////////////////////////////////////////////////////////////////////////////// wifi
     DynamicJsonDocument jsonDoc(256);
-    jsonDoc["sensor_type"] = "temperature";
-    jsonDoc["value"] = 25.5;
-    jsonDoc["unit"] = "Celsius";
-
-
-    // Serialize JSON to a string
-    String jsonString;
-    serializeJson(jsonDoc, jsonString);
-
-    // Send JSON string over the serial connection
-    Serial.println(jsonString);
-    
-// //////////////////////////////////////////////////////////////////////////////
+    jsonDoc["pvValu"] = analogRead(inPv);
+    jsonDoc["regValu"] = analogRead(inReg);
+    jsonDoc["energyReg"] = regEnrgy;
+    jsonDoc["energyPv"] = pvEnrgy;
+    jsonDoc["outPut"] = x;
+    String jsonStr;
+    serializeJson(jsonDoc, jsonStr);
+    sendToNodemCu(jsonStr);
+//     sendToNodemCu(jsonDoc);                    
+// //////////////////////////////////////////////////////////////////////////////////
 
 
  //PROGRAM THAT CONSISTS TO SWICTH EITHER MANUALLY OR AUTOMATICALLY
   if(pvValu > 100.0 && regValu > 100.0)
   {
-//    Serial.println(" A");
     //MANUAL SWITCHING BY BUTTON
-   // Serial.println();
     if(!digitalRead(pvButton))
     {
       y = 1;
     }
-    else if(!analogRead(A6))
+    else if(!digitalRead(pvButton))
     {
       y = 0;
     }
@@ -183,10 +178,7 @@ void loop() {
 //       Serial.println(" c");
     }
     else if (pvValu < 100.0 && regValu < 100.0){
-      ///when there no available source at all
-      // store data here
       //PROGRAM SAVE ENERGYY IN THE EEPROM MEMORY WHEN THE POWER GOES OUT
-//      Serial.println(" D");
    save (pvEnrgy,tab0);
    saveInteger (pvEnrgy,tab1); // complete tables  tab1 and tab0
    Write();
@@ -210,10 +202,7 @@ void loop() {
     digitalWrite(pvLed,1);
     digitalWrite(regLed,0);
   }
-//    digitalWrite(pvLed,1);
-//    digitalWrite(regLed,1);
 
-//digitalWrite(output,0);
 //PROGRAM TO DISPLAY ON THE LCD
    if (!x)
   {
@@ -258,14 +247,14 @@ if (!x){
    regEnrgy = f1 + getRegEnrgy;// add current value of energy to the stored value of pv energy
   //PROGRAM TO WRITE DATA IN THE SD CARDS ONE TIME A DAY
 
-   if (RTC.read(tm)) {
-  if(tm.Hour != ptm1.Hour){
-      // send PV & REG data to the server each hour
+//    if (RTC.read(tm)) {
+//   if(tm.Hour != ptm1.Hour){
+//       // send PV & REG data to the server each hour
 //         doc["hourlyPvEnergy"] = pvEnrgy;
 //         doc["hourlyRegEnergy"] = regEnrgy;
-    }
-  ptm1.Hour = tm.Hour;
- }
+//     }
+//   ptm1.Hour = tm.Hour;
+//  }
 }
 
 void lightLcd (){
@@ -551,4 +540,13 @@ double  calcVrmse(int crossings,int timeout)
   V_RATIO = _V_RATIO;
   sumV = 0;
   return Vrms ;
+}
+
+void sendToNodemCu (const String &jsonDoc) {
+
+  if (millis() - previousrealMillis >= 1000) {
+    previousrealMillis = millis();
+    // Send JSON string over the serial connection
+    espSerial.println(jsonDoc);
+  }
 }
